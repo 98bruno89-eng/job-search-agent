@@ -28,19 +28,77 @@ LEVER_COMPANIES = [
 ]
 
 # Keywords to match against job titles — case-insensitive substring match.
-# Keep this list tight; it's the cheap filter that keeps you from scoring
-# every posting a company has open.
+# Built from your actual job search tracker (Tiers 1-3): FP&A/Finance, Revenue
+# Management, Supply Chain/Product, and Data Analyst tracks.
 TARGET_TITLE_KEYWORDS = [
+    # Finance / FP&A
     "financial analyst",
+    "fp&a",
+    "fp & a",
+    "finance analyst",
+    "financial planning",
+    "engagement finance",
+    "sales finance",
+    "gtm finance",
+    "portfolio analyst",
+    "portfolio/asset",
+    "asset management analyst",
+    "capital planning",
+    "healthcare strategy analyst",
+    "strategy/finance",
+    "credit analyst",
+    "treasury analyst",
+
+    # Revenue Management / Pricing (careful: excludes actuarial "Pricing Analyst" below)
+    "revenue analyst",
+    "revenue management analyst",
+    "rm analyst",
+    "inventory analyst",
+
+    # Supply Chain / Product
+    "supply chain analyst",
+    "demand planning",
+    "supply planning",
+    "s&op analyst",
+    "category analyst",
+    "category pricing",
+    "merchandise planning",
+    "assortment analyst",
+
+    # Data / BI
     "data analyst",
     "business analyst",
-    "finance",
-    "analytics",
+    "bi analyst",
+    "business intelligence analyst",
+    "analytics analyst",
+    "insight analyst",
+    "analytics engineer",
+]
+
+# Titles to exclude even if they match a keyword above — two categories:
+# 1. Seniority/leadership tiers you're not targeting
+# 2. Specific title families that share words but are a different career track
+#    (e.g. "Pricing Analyst" alone, outside revenue management, is usually the
+#    actuarial track requiring SOA/CAS exams — not a fit per your own notes)
+EXCLUDED_TITLE_SIGNALS = [
+    "director",
+    " vp ",
+    " vp,",
+    " vp-",
+    "vice president",
+    "head of",
+    "staff ",
+    "principal ",
+    # Note: "senior manager" specifically excluded, but plain "senior financial analyst"
+    # and "lead analyst"/"lead financial analyst" are fine — those stay individual-contributor.
+    "senior manager",
 ]
 
 
 def _title_matches(title: str) -> bool:
     title_lower = title.lower()
+    if any(signal in title_lower for signal in EXCLUDED_TITLE_SIGNALS):
+        return False
     return any(keyword in title_lower for keyword in TARGET_TITLE_KEYWORDS)
 
 
@@ -114,8 +172,8 @@ def fetch_all_postings() -> list[dict]:
     return all_postings
 
 
-# Locations you're open to. Add city names, "remote", state abbreviations, etc.
-# Keep it lowercase — matching is case-insensitive.
+# Locations you're open to — where you live, and anywhere you'd be willing to relocate to.
+# Add city names, "remote", state abbreviations, etc. Matching is case-insensitive.
 PREFERRED_LOCATIONS = [
     "miami",
     "new york",
@@ -128,12 +186,13 @@ PREFERRED_LOCATIONS = [
     "atlanta",
     "orlando",
     "remote",
+    # add any other cities/regions you'd genuinely relocate to
 ]
 
-# Locations/signals that mean "probably not" — relocation requirements you don't want,
-# specific cities/countries that are dealbreakers, etc.
+# Specific locations you do NOT want, regardless of whether relocation is offered.
+# You mentioned no hard-pass locations right now — leave empty unless that changes.
 EXCLUDED_LOCATIONS = [
-    # no hard passes right now
+    # no hard passes currently
 ]
 
 
@@ -141,6 +200,9 @@ def tag_location(posting_text: str) -> str:
     """
     Lightweight rule-based location tagger — no LLM call, just keyword matching
     against the posting text. Returns one of: 'preferred', 'excludes', 'unclear'.
+
+    Only keys off actual place names, not the word "relocation" itself — a posting
+    that offers relocation to a place you like (or already live in) should NOT be excluded.
     """
     text_lower = posting_text.lower()
 
