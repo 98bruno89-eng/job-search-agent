@@ -107,6 +107,34 @@ st.markdown("""
     }
     a.view-job-link:hover { text-decoration: underline; }
 
+    .stats-row {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-top: 0.4rem;
+    }
+    .stat-item {
+        flex: 1;
+        text-align: center;
+        min-width: 0;
+    }
+    .stat-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #F2F2F0;
+        line-height: 1.1;
+    }
+    .stat-label {
+        font-size: 0.72rem;
+        color: #8A8A87;
+        margin-top: 0.15rem;
+    }
+    @media (max-width: 640px) {
+        .stat-value { font-size: 1.25rem; }
+        .stat-label { font-size: 0.65rem; }
+    }
+
     /* Mobile */
     @media (max-width: 640px) {
         .block-container { padding-left: 0.7rem; padding-right: 0.7rem; }
@@ -250,11 +278,16 @@ st.title("Job Search Dashboard")
 # Stats summary — reflects ALL matches regardless of current filters
 counts = fetch_status_counts()
 total = sum(counts.values())
-stat1, stat2, stat3, stat4 = st.columns(4)
-stat1.metric("Total", total)
-stat2.metric("Applied", counts["applied"])
-stat3.metric("Skipped", counts["skipped"])
-stat4.metric("Pending", counts["not_applied"])
+
+stats_html = textwrap.dedent(f"""
+<div class="stats-row">
+<div class="stat-item"><div class="stat-value">{total}</div><div class="stat-label">Total</div></div>
+<div class="stat-item"><div class="stat-value">{counts['applied']}</div><div class="stat-label">Applied</div></div>
+<div class="stat-item"><div class="stat-value">{counts['skipped']}</div><div class="stat-label">Skipped</div></div>
+<div class="stat-item"><div class="stat-value">{counts['not_applied']}</div><div class="stat-label">Pending</div></div>
+</div>
+""").strip()
+st.markdown(stats_html, unsafe_allow_html=True)
 
 st.divider()
 
