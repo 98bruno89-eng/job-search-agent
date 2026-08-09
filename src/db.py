@@ -32,6 +32,11 @@ def init_db():
         posting_url TEXT,
         location_tag TEXT,
         contact_name TEXT,
+        job_location TEXT,
+        work_arrangement TEXT,
+        role_overview TEXT,
+        key_responsibilities JSONB,
+        key_requirements JSONB,
         match_score INTEGER,
         summary TEXT,
         matched_qualifications JSONB,
@@ -64,10 +69,11 @@ def save_match(company, job_title, job_posting_text, result: dict,
     sql = """
     INSERT INTO job_matches
         (company, job_title, job_posting_text, source, external_id, posting_url, location_tag,
-         contact_name, match_score, summary,
+         contact_name, job_location, work_arrangement, role_overview,
+         key_responsibilities, key_requirements, match_score, summary,
          matched_qualifications, skill_gaps, ats_keywords_missing, resume_suggestions,
          supervisor_verdict, supervisor_confidence, supervisor_feedback)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     RETURNING id;
     """
     conn = get_connection()
@@ -82,6 +88,11 @@ def save_match(company, job_title, job_posting_text, result: dict,
                 posting_url,
                 location_tag,
                 result.get("recruiter_or_hiring_manager_name"),
+                result.get("job_location"),
+                result.get("work_arrangement"),
+                result.get("role_overview"),
+                Json(result.get("key_responsibilities", [])),
+                Json(result.get("key_requirements", [])),
                 result.get("match_score"),
                 result.get("summary"),
                 Json(result.get("matched_qualifications", [])),

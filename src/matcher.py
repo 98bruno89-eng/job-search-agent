@@ -69,7 +69,12 @@ The JSON must have exactly these keys:
     "<specific, actionable suggestion for improving the resume>",
     "<specific, actionable suggestion for improving the resume>"
   ],
-  "recruiter_or_hiring_manager_name": "<a specific person's name ONLY if explicitly named in the posting text itself, e.g. 'Reporting to Jane Smith' or a named recruiter contact — otherwise null. Do NOT guess, infer, or invent a name.>"
+  "recruiter_or_hiring_manager_name": "<a specific person's name ONLY if explicitly named in the posting text itself, e.g. 'Reporting to Jane Smith' or a named recruiter contact — otherwise null. Do NOT guess, infer, or invent a name.>",
+  "job_location": "<the actual city/state/country location(s) stated in the posting, e.g. 'Miami, FL' or 'Bangkok, Thailand' — otherwise null if not stated>",
+  "work_arrangement": "<one of: 'remote', 'hybrid', 'in-person', or 'unspecified' if the posting doesn't say>",
+  "role_overview": "<2-3 plain-language sentences on what this role actually does day-to-day, based on the posting. Do NOT include company boilerplate, EEO statements, hashtag city lists, disclaimers, or generic 'about the company' marketing copy.>",
+  "key_responsibilities": ["<a real, specific responsibility from the posting>", "... 3-6 items, concise, no boilerplate"],
+  "key_requirements": ["<a real, specific requirement from the posting — this is about the ROLE's stated requirements in general, separate from the candidate-specific matched_qualifications/skill_gaps above>", "... 3-6 items, concise, no boilerplate"]
 }}
 
 RESUME:
