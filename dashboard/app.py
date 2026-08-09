@@ -62,6 +62,18 @@ st.markdown("""
     .score-high   { background: #2E5C4E; color: #A8E6C9; }
     .score-mid    { background: #5C4E2E; color: #E6C9A8; }
     .score-low    { background: #5C2E33; color: #E6A8AD; }
+
+    /* Mobile: tighter padding, larger tap targets for buttons */
+    @media (max-width: 640px) {
+        .block-container { padding-left: 0.8rem; padding-right: 0.8rem; padding-top: 1rem; }
+        .job-card { padding: 0.9rem 1rem; }
+        .job-title { font-size: 0.98rem; }
+        div[data-testid="stButton"] > button {
+            width: 100%;
+            padding-top: 0.55rem;
+            padding-bottom: 0.55rem;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -73,7 +85,8 @@ def get_connection():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 
-def fetch_matches(min_score: int, location_filter: str, status_filter: str):
+def fetch_matches(min_score: int, location_filter: str, status_filter: str,
+                   search_text: str, sort_by: str):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -93,10 +106,37 @@ def fetch_matches(min_score: int, location_filter: str, status_filter: str):
                 query += " AND status = %s"
                 params.append(status_filter)
 
-            query += " ORDER BY match_score DESC, created_at DESC"
+            if search_text:
+                query += " AND (company ILIKE %s OR job_title ILIKE %s)"
+                like_term = f"%{search_text}%"
+                params.extend([like_term, like_term])
+
+            if sort_by == "Newest first":
+                query += " ORDER BY created_at DESC"
+            else:
+                query += " ORDER BY match_score DESC, created_at DESC"
 
             cur.execute(query, params)
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def fetch_status_counts():
+    """Counts across ALL matches, ignoring current filters — for the summary bar."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT status, COUNT(*) as count
+                FROM job_matches
+                GROUP BY status;
+            """)
+            rows = cur.fetchall()
+            counts = {"not_applied": 0, "applied": 0, "skipped": 0}
+            for row in rows:
+                counts[row["status"]] = row["count"]
+            return counts
     finally:
         conn.close()
 
@@ -130,15 +170,30 @@ def score_class(score: int) -> str:
 # --- UI ---
 st.title("Job Search Dashboard")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    min_score = st.slider("Minimum match score", 0, 100, 65, step=5)
-with col2:
-    location_filter = st.selectbox("Location", ["All", "preferred", "unclear", "excludes"])
-with col3:
-    status_filter = st.selectbox("Status", ["All", "not_applied", "applied", "skipped"])
+# Stats summary — reflects ALL matches regardless of current filters
+counts = fetch_status_counts()
+total = sum(counts.values())
+stat1, stat2, stat3, stat4 = st.columns(4)
+stat1.metric("Total", total)
+stat2.metric("Applied", counts["applied"])
+stat3.metric("Skipped", counts["skipped"])
+stat4.metric("Pending", counts["not_applied"])
 
-matches = fetch_matches(min_score, location_filter, status_filter)
+st.divider()
+
+search_text = st.text_input("Search company or title", placeholder="e.g. agoda, financial analyst")
+
+filter_row = st.columns(4)
+with filter_row[0]:
+    min_score = st.slider("Minimum match score", 0, 100, 65, step=5)
+with filter_row[1]:
+    location_filter = st.selectbox("Location", ["All", "preferred", "unclear", "excludes"])
+with filter_row[2]:
+    status_filter = st.selectbox("Status", ["All", "not_applied", "applied", "skipped"])
+with filter_row[3]:
+    sort_by = st.selectbox("Sort by", ["Score (high to low)", "Newest first"])
+
+matches = fetch_matches(min_score, location_filter, status_filter, search_text, sort_by)
 st.caption(f"{len(matches)} matches")
 
 for m in matches:

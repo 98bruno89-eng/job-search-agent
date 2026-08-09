@@ -11,6 +11,39 @@ companies embed on their careers pages.
 """
 
 import requests
+from html.parser import HTMLParser
+
+
+class _HTMLTextExtractor(HTMLParser):
+    """Minimal HTML-to-text stripper — no external dependency needed."""
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+    def get_text(self):
+        return " ".join(self.parts)
+
+
+def strip_html(raw_html: str) -> str:
+    """
+    Strip HTML tags from Greenhouse posting content before sending to the
+    scoring agent — cuts token usage with no loss of actual information,
+    since the LLM only needs the text, not the markup.
+    """
+    if not raw_html:
+        return ""
+    parser = _HTMLTextExtractor()
+    try:
+        parser.feed(raw_html)
+        text = parser.get_text()
+    except Exception:
+        # If parsing fails for any reason, fall back to the raw text rather than crash
+        return raw_html
+    # Collapse repeated whitespace left behind by stripped tags
+    return " ".join(text.split())
 
 # --- Config: companies to pull from ---
 # Find the slug from the company's careers page URL, e.g.
@@ -114,14 +147,16 @@ def fetch_greenhouse_postings(company_slug: str) -> list[dict]:
         title = job.get("title", "")
         if not _title_matches(title):
             continue
+        raw_content = job.get("content", "")
+        clean_content = strip_html(raw_content)
         postings.append({
             "company": company_slug,
             "job_title": title,
-            "text": job.get("content", ""),  # HTML — strip tags before scoring if needed
+            "text": clean_content,
             "source": "greenhouse",
             "external_id": str(job.get("id")),
             "url": job.get("absolute_url", ""),
-            "location_tag": tag_location(job.get("content", "") + " " + title),
+            "location_tag": tag_location(clean_content + " " + title),
         })
     return postings
 
