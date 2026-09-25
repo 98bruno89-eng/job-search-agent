@@ -104,7 +104,7 @@ LEVER_COMPANIES = [
 # You have to find these manually per company (see fetch_workday_postings
 # docstring for how). Example entries left commented as a template.
 WORKDAY_COMPANIES = [
-    # ("companytenant", "ExternalCareerSite", "wd5"),
+    ("lilly", "LLY", "wd115"),
 ]
 
 # Keywords to match against job titles — case-insensitive substring match.
@@ -182,6 +182,22 @@ def _title_matches(title: str) -> bool:
     return any(keyword in title_lower for keyword in TARGET_TITLE_KEYWORDS)
 
 
+def detect_work_type(text: str) -> str:
+    """
+    Lightweight keyword detection for remote/hybrid/on-site, scanning title +
+    location + posting text. Not always specified — returns 'Not specified'
+    when no clear signal is found rather than guessing.
+    """
+    text_lower = text.lower()
+    if "hybrid" in text_lower:
+        return "Hybrid"
+    if "remote" in text_lower:
+        return "Remote"
+    if "on-site" in text_lower or "onsite" in text_lower or "in-office" in text_lower or "in office" in text_lower:
+        return "On-site"
+    return "Not specified"
+
+
 def fetch_greenhouse_postings(company_slug: str) -> list[dict]:
     """Pull all open postings for a company from Greenhouse's public API."""
     url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs?content=true"
@@ -196,6 +212,11 @@ def fetch_greenhouse_postings(company_slug: str) -> list[dict]:
             continue
         raw_content = job.get("content", "")
         clean_content = strip_html(raw_content)
+        real_location = job.get("location", {}).get("name", "") or "Not specified"
+
+        if not is_us_or_remote(f"{real_location} {title} {clean_content}"):
+            continue
+
         postings.append({
             "company": company_slug,
             "job_title": title,
@@ -204,6 +225,8 @@ def fetch_greenhouse_postings(company_slug: str) -> list[dict]:
             "external_id": str(job.get("id")),
             "url": job.get("absolute_url", ""),
             "location_tag": tag_location(clean_content + " " + title),
+            "location": real_location,
+            "work_type": detect_work_type(f"{title} {real_location} {clean_content}"),
         })
     return postings
 
@@ -221,6 +244,11 @@ def fetch_lever_postings(company_slug: str) -> list[dict]:
         if not _title_matches(title):
             continue
         description = job.get("descriptionPlain") or job.get("description", "")
+        real_location = job.get("categories", {}).get("location", "") or "Not specified"
+
+        if not is_us_or_remote(f"{real_location} {title} {description}"):
+            continue
+
         postings.append({
             "company": company_slug,
             "job_title": title,
@@ -229,6 +257,8 @@ def fetch_lever_postings(company_slug: str) -> list[dict]:
             "external_id": str(job.get("id")),
             "url": job.get("hostedUrl", ""),
             "location_tag": tag_location(description + " " + title),
+            "location": real_location,
+            "work_type": detect_work_type(f"{title} {real_location} {description}"),
         })
     return postings
 
@@ -283,6 +313,38 @@ PREFERRED_LOCATIONS = [
 EXCLUDED_LOCATIONS = [
     # no hard passes currently
 ]
+
+# US-only scoping: postings mentioning any of these are excluded BEFORE
+# scoring (saves tokens, not just a display tag). This is a hard filter —
+# decided against international roles, including international remote,
+# since volume is low and legitimacy is harder to verify.
+NON_US_SIGNALS = [
+    "bangkok", "thailand", "singapore", "philippines", "manila",
+    "united kingdom", "london", "uk based", "u.k.",
+    "india", "bangalore", "mumbai", "delhi", "hyderabad",
+    "china", "beijing", "shanghai", "hong kong",
+    "japan", "tokyo", "korea", "seoul",
+    "germany", "berlin", "munich", "france", "paris",
+    "canada", "toronto", "vancouver", "montreal",
+    "australia", "sydney", "melbourne",
+    "mexico city", "brazil", "sao paulo",
+    "dubai", "uae", "saudi arabia", "riyadh",
+    "vietnam", "hanoi", "hcmc", "indonesia", "jakarta",
+    "poland", "warsaw", "spain", "madrid", "barcelona",
+    "italy", "milan", "netherlands", "amsterdam",
+    "ireland", "dublin", "israel", "tel aviv",
+]
+
+
+def is_us_or_remote(posting_text: str) -> bool:
+    """
+    Hard pre-scoring filter: returns False if the posting clearly mentions a
+    non-US location, True otherwise (includes "remote", US-based postings,
+    and postings that don't mention location at all — better to let an
+    ambiguous one through than wrongly exclude a real US posting).
+    """
+    text_lower = posting_text.lower()
+    return not any(signal in text_lower for signal in NON_US_SIGNALS)
 
 
 def tag_location(posting_text: str) -> str:
@@ -353,7 +415,11 @@ def fetch_workday_postings(tenant: str, site: str, wd_server: str = "wd1") -> li
             if not _title_matches(title):
                 continue
             external_path = job.get("externalPath", "")
-            location_text = job.get("locationsText", "")
+            location_text = job.get("locationsText", "") or "Not specified"
+
+            if not is_us_or_remote(f"{location_text} {title}"):
+                continue
+
             postings.append({
                 "company": tenant,
                 "job_title": title,
@@ -364,6 +430,8 @@ def fetch_workday_postings(tenant: str, site: str, wd_server: str = "wd1") -> li
                 "external_id": external_path or title,
                 "url": f"https://{tenant}.{wd_server}.myworkdayjobs.com/en-US/{site}{external_path}",
                 "location_tag": tag_location(location_text + " " + title),
+                "location": location_text,
+                "work_type": detect_work_type(f"{title} {location_text}"),
             })
 
         offset += limit
