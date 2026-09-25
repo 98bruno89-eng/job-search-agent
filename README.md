@@ -2,7 +2,7 @@ Job Search Agent
 
 An automated pipeline that sources job postings, scores them against my resume, and reviews its own output before saving results — built to run daily without me touching it.
 
-Live dashboard: [add your Streamlit URL here]
+Live dashboard: [(https://bruno-job-search-agent.streamlit.app/)]
 
 What this does
 
